@@ -1,63 +1,127 @@
-"""Bokeh visualization for the mapping of ideal functions to training data points."""
+"""Bokeh visualization for training data, ideal functions, and the test-data mapping."""
 
 from __future__ import annotations
 
-from bokeh.models import ColumnDataSource
-from bokeh.plotting import figure, output_file, save
-from bokeh.layouts import gridplot, column
-from bokeh.palettes import Category10
-
-from find_ideal_func.selection import SelectedIdealFunction
-from find_ideal_func.mapping import MappingResult
-
 import pandas as pd
-import numpy as np
+from bokeh.layouts import column, gridplot
+from bokeh.models import ColorBar, ColumnDataSource
+from bokeh.palettes import Category10, Viridis256
+from bokeh.plotting import figure, output_file, save
+from bokeh.transform import linear_cmap
+
+from find_ideal_func.mapping import MappingResult
+from find_ideal_func.selection import SelectedIdealFunction
+
 
 class Vizualizer:
-    """Class to visualize the mapping of ideal functions to training data points using Bokeh."""
-    
-    def __init__(self, t_data: pd.DataFrame, ideal_functions: pd.DataFrame, selected_functions: list[SelectedIdealFunction], mapping_results: list[MappingResult]):
+    """Builds Bokeh plots for the training/ideal data and the test-data mapping."""
+
+    def __init__(
+        self,
+        training_data: pd.DataFrame,
+        test_data: pd.DataFrame,
+        ideal_functions: pd.DataFrame,
+        selected_functions: list[SelectedIdealFunction],
+        mapping_results: list[MappingResult],
+    ) -> None:
         """
-        Initialize the Vizualizer with training data, ideal functions, selected functions, and mapping results.
+        Initialize the Vizualizer with training data, test data, ideal functions,
+        the four selected ideal functions, and the test-data mapping results.
 
         Args:
-            t_data (pd.DataFrame): The training data containing 'x' and 'y' columns.
-            ideal_functions (pd.DataFrame): The ideal functions containing 'x' and multiple 'y' columns.
-            selected_functions (list[SelectedIdealFunction]): A list of SelectedIdealFunction instances for each training data point.
-            mapping_results (list[MappingResult]): A list of MappingResult instances for each training data point.
+            training_data (pd.DataFrame): The training data with 'x' and 'y1'..'y4' columns.
+            test_data (pd.DataFrame): The test data with 'x' and 'y' columns.
+            ideal_functions (pd.DataFrame): The ideal functions with 'x' and 'y1'..'y50' columns.
+            selected_functions (list[SelectedIdealFunction]): The four chosen ideal functions.
+            mapping_results (list[MappingResult]): The test-point mapping outcomes.
         """
-        self.t_data = t_data
+        self.training_data = training_data
+        self.test_data = test_data
         self.ideal_functions = ideal_functions
         self.selected_functions = selected_functions
         self.mapping_results = mapping_results
 
+    def _training_vs_ideal_plots(self):
+        """Build one subplot per training column, overlaid with its chosen ideal function."""
+        colors = Category10[4]
+        plots = []
+
+        for color, sf in zip(colors, self.selected_functions):
+            p = figure(
+                title=f"{sf.t_column} vs {sf.ideal_column} (SSE={sf.sse:.2f})",
+                x_axis_label="x",
+                y_axis_label="y",
+                width=400,
+                height=300,
+            )
+            p.scatter(
+                self.training_data["x"],
+                self.training_data[sf.t_column],
+                size=4,
+                color=color,
+                legend_label="training",
+                marker="circle",
+            )
+            p.line(
+                self.ideal_functions["x"],
+                self.ideal_functions[sf.ideal_column],
+                color="black",
+                legend_label="ideal function",
+            )
+            plots.append(p)
+
+        return gridplot(plots, ncols=2)
+
+    def _test_mapping_plot(self):
+        """Build the test-point plot, colored by deviation, with unmapped points in gray."""
+        mapped = [r for r in self.mapping_results if r.ideal_function_number is not None]
+        unmapped = [r for r in self.mapping_results if r.ideal_function_number is None]
+
+        p = figure(
+            title="Test data mapping (color = deviation from assigned ideal function)",
+            x_axis_label="x",
+            y_axis_label="y",
+            width=800,
+            height=400,
+        )
+
+        if mapped:
+            source = ColumnDataSource(
+                data=dict(
+                    x=[r.x for r in mapped],
+                    y=[r.y for r in mapped],
+                    delta_y=[r.delta_y for r in mapped],
+                    idf_number=[r.ideal_function_number for r in mapped],
+                )
+            )
+            mapper = linear_cmap(
+                "delta_y",
+                Viridis256,
+                low=min(source.data["delta_y"]),
+                high=max(source.data["delta_y"]),
+            )
+            p.scatter("x", "y", source=source, size=8, color=mapper, marker="circle", legend_label="mapped")
+            p.add_layout(ColorBar(color_mapper=mapper["transform"], title="delta_y"), "right")
+
+        if unmapped:
+            p.scatter(
+                [r.x for r in unmapped],
+                [r.y for r in unmapped],
+                size=6,
+                color="gray",
+                marker="x",
+                legend_label="unmapped",
+            )
+
+        p.legend.click_policy = "hide"
+        return p
+
     def render(self, output_html: str) -> None:
         """
-        Render the visualization and save it to an HTML file.
+        Render all plots and save them to a single HTML file.
 
         Args:
             output_html (str): The path to the output HTML file.
         """
         output_file(output_html)
-        
-        # Create a figure for the training data
-        p1 = figure(title="Training Data", x_axis_label='x', y_axis_label='y', width=800, height=400)
-        p1.scatter(self.t_data['x'], self.t_data['y'], color='blue', legend_label='Training Data', size=5)
-        
-        # Create a figure for the ideal functions
-        p2 = figure(title="Ideal Functions", x_axis_label='x', y_axis_label='y', width=800, height=400)
-        colors = Category10[10]
-        for i, col in enumerate(self.ideal_functions.columns[1:]):  # Skip 'x' column
-            p2.line(self.ideal_functions['x'], self.ideal_functions[col], color=colors[i % len(colors)], legend_label=col)
-        
-        # Create a figure for the mapping results
-        p3 = figure(title="Mapping Results", x_axis_label='x', y_axis_label='y', width=800, height=400)
-        for result in self.mapping_results:
-            if result.delta_y is not None:
-                p3.circle(result.x, result.y, color='red', size=5, legend_label=f'Ideal Function {result.ideal_function_number}')
-        
-        # Arrange the plots in a grid layout
-        grid = gridplot([[p1], [p2], [p3]])
-        
-        # Save the visualization to an HTML file
-        save(grid)
+        save(column(self._training_vs_ideal_plots(), self._test_mapping_plot()))

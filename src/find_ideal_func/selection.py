@@ -62,8 +62,9 @@ class IdealFunctionSelector:
         selected_functions = []
 
         for t_col in self.training_data.columns:
-            min_sse_col = sse_df[t_col].idxmin()
-            min_sse_value = sse_df[t_col].min()
+            row = sse_df.loc[t_col]
+            min_sse_col = row.idxmin()
+            min_sse_value = row.min()
 
             # Calculate max delta_y for the selected ideal function
             ideal_y_values = self.ideal_functions[min_sse_col].to_numpy()

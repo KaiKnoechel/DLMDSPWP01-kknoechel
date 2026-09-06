@@ -14,10 +14,10 @@ from find_ideal_func.selection import SelectedIdealFunction
 @dataclass(frozen=True)
 class MappingResult:
     """Dataclass to hold the mapping result for a given training data point."""
-    delta_y: float
+    delta_y: float | None
     x: float
     y: float
-    ideal_function_number: int
+    ideal_function_number: int | None
     
 
 class TestDataMapper:
@@ -34,7 +34,7 @@ class TestDataMapper:
             session (Session): The SQLAlchemy session for database operations.
         """
         self.t_data = t_data
-        self.ideal_functions = ideal_functions
+        self.ideal_functions = ideal_functions.set_index("x").sort_index()
         self.select_functions = select_functions
         self.session = session
         
@@ -64,21 +64,23 @@ class TestDataMapper:
                 current_delta_y = abs(y - ideal_y)
 
                 if current_delta_y <= allowed_delta_y:
-                    idf_number = idf_num
-                    delta_y = current_delta_y
-                    break
+                    if delta_y is None or current_delta_y < delta_y:
+                        idf_number = idf_num
+                        delta_y = current_delta_y
             results.append(MappingResult(delta_y=delta_y, x=x, y=y, ideal_function_number=idf_number))
 
         return results
     
     def save_results(self, results: list[MappingResult]) -> None:
-        """Save the mapping results to the database."""
+        """Save the successfully mapped test points to the database."""
         for result in results:
+            if result.ideal_function_number is None:
+                continue
             mapping = Mappings(
                 x=result.x,
                 y=result.y,
-                delta_y=result.delta_y if result.delta_y is not None else float('nan'),
-                ideal_function_number=result.ideal_function_number if result.ideal_function_number is not None else -1
+                delta_y=result.delta_y,
+                ideal_function_number=result.ideal_function_number
             )
             self.session.add(mapping)
         self.session.commit()
