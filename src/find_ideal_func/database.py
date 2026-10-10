@@ -10,8 +10,11 @@ requried tables:
 
 from __future__ import annotations
 
-from sqlalchemy import create_engine, Column, Integer, Float
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+from sqlalchemy import Column, Float, Integer, create_engine
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
 class Base(DeclarativeBase):
@@ -20,6 +23,7 @@ class Base(DeclarativeBase):
 
 class TData(Base):
     """SQLAlchemy model for the TrainingData table."""
+
     __tablename__ = "TrainingData"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -29,8 +33,10 @@ class TData(Base):
     y3 = Column(Float, nullable=False)
     y4 = Column(Float, nullable=False)
 
+
 class Mappings(Base):
     """SQLAlchemy model for the Mappings table."""
+
     __tablename__ = "Mappings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -38,6 +44,7 @@ class Mappings(Base):
     y = Column(Float, nullable=False)
     delta_y = Column(Float, nullable=False)
     ideal_function_number = Column(Integer, nullable=False)
+
 
 class DbManager:
     """
@@ -54,7 +61,9 @@ class DbManager:
             db_url (str): The database URL for SQLAlchemy.
         """
         self.engine = create_engine(db_url)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=self.engine
+        )
 
     def init_db(self):
         """Create all tables in the database."""
@@ -69,14 +78,31 @@ class DbManager:
         """
         return self.SessionLocal()
 
+    @contextmanager
+    def session_scope(self) -> Iterator[Session]:
+        """Provide a transactional scope around a series of operations."""
+        session = self.get_session()
+        try:
+            yield session
+            session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+
 def _ideal_function_columns() -> dict[str, Column]:
     """Return a dictionary of ideal function columns."""
     return {f"ideal_function_{i}": Column(Float, nullable=True) for i in range(1, 51)}
 
-IdealFunctionColumns = type('IdealFunctionColumns', (Base,), 
-{ 
-    "__tablename__": "IdealFunction",
-    "x": Column(Float, primary_key=True, nullable=False),
-    **_ideal_function_columns()
-},)
 
+IdealFunctionColumns = type(
+    "IdealFunctionColumns",
+    (Base,),
+    {
+        "__tablename__": "IdealFunction",
+        "x": Column(Float, primary_key=True, nullable=False),
+        **_ideal_function_columns(),
+    },
+)

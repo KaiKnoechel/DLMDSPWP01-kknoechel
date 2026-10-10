@@ -24,17 +24,25 @@ def ideal_functions() -> pd.DataFrame:
 @pytest.fixture
 def selected_functions() -> list[SelectedIdealFunction]:
     return [
-        SelectedIdealFunction(ideal_column="y1", t_column="ta", idf_number=1, sse=0.0, max_delta_y=1.0),
-        SelectedIdealFunction(ideal_column="y2", t_column="tb", idf_number=2, sse=0.0, max_delta_y=0.5),
+        SelectedIdealFunction(
+            ideal_column="y1", t_column="ta", idf_number=1, sse=0.0, max_delta_y=1.0
+        ),
+        SelectedIdealFunction(
+            ideal_column="y2", t_column="tb", idf_number=2, sse=0.0, max_delta_y=0.5
+        ),
     ]
 
 
-def _mapper(test_data: pd.DataFrame, ideal_functions: pd.DataFrame, selected_functions) -> TestDataMapper:
+def _mapper(
+    test_data: pd.DataFrame, ideal_functions: pd.DataFrame, selected_functions
+) -> TestDataMapper:
     return TestDataMapper(test_data, ideal_functions, selected_functions, session=None)
 
 
 def test_map_data_matches_within_tolerance(ideal_functions, selected_functions):
-    test_data = pd.DataFrame({"x": [0.0], "y": [0.5]})  # |0.5 - 0| = 0.5 <= 1.0 * sqrt(2)
+    test_data = pd.DataFrame(
+        {"x": [0.0], "y": [0.5]}
+    )  # |0.5 - 0| = 0.5 <= 1.0 * sqrt(2)
 
     results = _mapper(test_data, ideal_functions, selected_functions).map_data()
 
@@ -43,7 +51,9 @@ def test_map_data_matches_within_tolerance(ideal_functions, selected_functions):
     assert results[0].delta_y == pytest.approx(0.5)
 
 
-def test_map_data_rejects_deviation_beyond_tolerance(ideal_functions, selected_functions):
+def test_map_data_rejects_deviation_beyond_tolerance(
+    ideal_functions, selected_functions
+):
     test_data = pd.DataFrame({"x": [2.0], "y": [100.0]})
 
     results = _mapper(test_data, ideal_functions, selected_functions).map_data()
@@ -52,7 +62,9 @@ def test_map_data_rejects_deviation_beyond_tolerance(ideal_functions, selected_f
     assert results[0].delta_y is None
 
 
-def test_map_data_ignores_x_missing_from_ideal_functions(ideal_functions, selected_functions):
+def test_map_data_ignores_x_missing_from_ideal_functions(
+    ideal_functions, selected_functions
+):
     test_data = pd.DataFrame({"x": [99.0], "y": [0.0]})
 
     results = _mapper(test_data, ideal_functions, selected_functions).map_data()
@@ -64,8 +76,12 @@ def test_map_data_ignores_x_missing_from_ideal_functions(ideal_functions, select
 def test_map_data_picks_closest_match_when_multiple_qualify():
     ideal_functions = pd.DataFrame({"x": [0.0], "y1": [0.0], "y3": [0.1]})
     selected_functions = [
-        SelectedIdealFunction(ideal_column="y1", t_column="ta", idf_number=1, sse=0.0, max_delta_y=1.0),
-        SelectedIdealFunction(ideal_column="y3", t_column="tc", idf_number=3, sse=0.0, max_delta_y=1.0),
+        SelectedIdealFunction(
+            ideal_column="y1", t_column="ta", idf_number=1, sse=0.0, max_delta_y=1.0
+        ),
+        SelectedIdealFunction(
+            ideal_column="y3", t_column="tc", idf_number=3, sse=0.0, max_delta_y=1.0
+        ),
     ]
     # y=0.03 is within tolerance of BOTH y1 (dev 0.03) and y3 (dev 0.07) -> closest one must win
     test_data = pd.DataFrame({"x": [0.0], "y": [0.03]})
@@ -81,7 +97,9 @@ def test_save_results_skips_unmapped_points(tmp_path):
     db.init_db()
     session = db.get_session()
 
-    mapper = TestDataMapper(pd.DataFrame({"x": []}), pd.DataFrame({"x": []}), [], session)
+    mapper = TestDataMapper(
+        pd.DataFrame({"x": []}), pd.DataFrame({"x": []}), [], session
+    )
     results = [
         MappingResult(delta_y=0.1, x=1.0, y=2.0, ideal_function_number=5),
         MappingResult(delta_y=None, x=3.0, y=4.0, ideal_function_number=None),

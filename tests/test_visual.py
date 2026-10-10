@@ -19,7 +19,9 @@ def test_render_writes_html_file(tmp_path):
     test_data = pd.DataFrame({"x": [0.0, 1.0], "y": [0.1, 0.9]})
     ideal_functions = pd.DataFrame({"x": [0.0, 1.0], "y1": [0.0, 1.0]})
     selected_functions = [
-        SelectedIdealFunction(ideal_column="y1", t_column="y1", idf_number=1, sse=0.01, max_delta_y=0.1)
+        SelectedIdealFunction(
+            ideal_column="y1", t_column="y1", idf_number=1, sse=0.01, max_delta_y=0.1
+        )
     ]
     mapping_results = [
         MappingResult(delta_y=0.1, x=0.0, y=0.1, ideal_function_number=1),
@@ -27,7 +29,9 @@ def test_render_writes_html_file(tmp_path):
     ]
 
     out_file = tmp_path / "viz.html"
-    Vizualizer(training_data, test_data, ideal_functions, selected_functions, mapping_results).render(str(out_file))
+    Vizualizer(
+        training_data, test_data, ideal_functions, selected_functions, mapping_results
+    ).render(str(out_file))
 
     assert out_file.exists()
     assert out_file.stat().st_size > 0

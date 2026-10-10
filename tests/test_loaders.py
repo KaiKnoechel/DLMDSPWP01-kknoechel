@@ -8,7 +8,11 @@ from sqlalchemy import inspect
 
 from find_ideal_func.database import DbManager
 from find_ideal_func.errors import DatavalidatorError
-from find_ideal_func.loaders import IFCSVLoader, TestDataCSVLoader, TrainingDataCSVLoader
+from find_ideal_func.loaders import (
+    IFCSVLoader,
+    TestDataCSVLoader,
+    TrainingDataCSVLoader,
+)
 
 
 def test_read_csv_raises_when_file_missing(tmp_path):
@@ -20,7 +24,9 @@ def test_read_csv_raises_when_file_missing(tmp_path):
 
 def test_load_df_raises_on_missing_columns(tmp_path):
     csv_path = tmp_path / "train.csv"
-    pd.DataFrame({"x": [0, 1], "y1": [0, 1]}).to_csv(csv_path, index=False)  # missing y2..y4
+    pd.DataFrame({"x": [0, 1], "y1": [0, 1]}).to_csv(
+        csv_path, index=False
+    )  # missing y2..y4
 
     db = DbManager(f"sqlite:///{tmp_path / 'db.sqlite'}")
     db.init_db()
@@ -43,6 +49,48 @@ def test_load_df_writes_table(tmp_path):
 
     assert list(df["y"]) == [1.0, 2.0]
     assert inspect(db.engine).has_table("TestData")
+    session.close()
+
+
+def test_load_df_rejects_missing_values(tmp_path):
+    csv_path = tmp_path / "test.csv"
+    pd.DataFrame({"x": [0.0, 1.0], "y": [1.0, None]}).to_csv(
+        csv_path,
+        index=False,
+    )
+
+    db = DbManager(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    db.init_db()
+    session = db.get_session()
+
+    with pytest.raises(DatavalidatorError):
+        TestDataCSVLoader(csv_path).load_df(session)
+
+    session.close()
+
+
+def test_load_df_rejects_duplicate_x_values(tmp_path):
+    csv_path = tmp_path / "train.csv"
+    pd.DataFrame(
+        {
+            "x": [0.0, 0.0],
+            "y1": [1.0, 2.0],
+            "y2": [1.0, 2.0],
+            "y3": [1.0, 2.0],
+            "y4": [1.0, 2.0],
+        }
+    ).to_csv(
+        csv_path,
+        index=False,
+    )
+
+    db = DbManager(f"sqlite:///{tmp_path / 'db.sqlite'}")
+    db.init_db()
+    session = db.get_session()
+
+    with pytest.raises(DatavalidatorError):
+        TrainingDataCSVLoader(csv_path).load_df(session)
+
     session.close()
 
 

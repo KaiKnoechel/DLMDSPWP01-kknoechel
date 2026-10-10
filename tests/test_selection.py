@@ -58,7 +58,9 @@ def test_select_ideal_function_reports_max_deviation(training_data, ideal_functi
         assert sf.sse >= 0
 
 
-def test_select_ideal_function_returns_one_result_per_training_column(training_data, ideal_functions):
+def test_select_ideal_function_returns_one_result_per_training_column(
+    training_data, ideal_functions
+):
     selector = IdealFunctionSelector(training_data, ideal_functions)
     selected = selector.select_ideal_function()
 

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 from bokeh.layouts import column, gridplot
-from bokeh.models import ColorBar, ColumnDataSource
+from bokeh.models import ColumnDataSource
+from bokeh.models.annotations import ColorBar
 from bokeh.palettes import Category10, Viridis256
 from bokeh.plotting import figure, output_file, save
 from bokeh.transform import linear_cmap
@@ -74,7 +75,9 @@ class Vizualizer:
 
     def _test_mapping_plot(self):
         """Build the test-point plot, colored by deviation, with unmapped points in gray."""
-        mapped = [r for r in self.mapping_results if r.ideal_function_number is not None]
+        mapped = [
+            r for r in self.mapping_results if r.ideal_function_number is not None
+        ]
         unmapped = [r for r in self.mapping_results if r.ideal_function_number is None]
 
         p = figure(
@@ -87,12 +90,14 @@ class Vizualizer:
 
         if mapped:
             source = ColumnDataSource(
-                data=dict(
-                    x=[r.x for r in mapped],
-                    y=[r.y for r in mapped],
-                    delta_y=[r.delta_y for r in mapped],
-                    idf_number=[r.ideal_function_number for r in mapped],
-                )
+                data={
+                    "x": [r.x for r in mapped],
+                    "y": [r.y for r in mapped],
+                    "delta_y": [r.delta_y for r in mapped],
+                    "idf_number": [
+                        r.ideal_function_number for r in mapped
+                    ],
+                }
             )
             mapper = linear_cmap(
                 "delta_y",
@@ -100,8 +105,18 @@ class Vizualizer:
                 low=min(source.data["delta_y"]),
                 high=max(source.data["delta_y"]),
             )
-            p.scatter("x", "y", source=source, size=8, color=mapper, marker="circle", legend_label="mapped")
-            p.add_layout(ColorBar(color_mapper=mapper["transform"], title="delta_y"), "right")
+            p.scatter(
+                "x",
+                "y",
+                source=source,
+                size=8,
+                color=mapper,
+                marker="circle",
+                legend_label="mapped",
+            )
+            p.add_layout(
+                ColorBar(color_mapper=mapper["transform"], title="delta_y"), "right"
+            )
 
         if unmapped:
             p.scatter(
